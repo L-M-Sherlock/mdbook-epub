@@ -111,6 +111,9 @@ impl<'a> Generator<'a> {
     /// Find assets for adding to the document later. For remote linked assets, they would be
     /// rendered differently in the document by provided information of assets.
     fn find_assets(&mut self) -> Result<(), Error> {
+        if self.config.skip_assets {
+            return Ok(());
+        }
         info!("2. find assets ==");
         let error = String::from("Failed finding/fetch resource taken from content? Look up content for possible error...");
         // resources::find can emit very unclear error based on internal MD content,
@@ -266,15 +269,26 @@ impl<'a> Generator<'a> {
         // to a temporary location.
         let mut count = 0;
         for asset in self.assets.values() {
-            self.handler.download(asset)?;
-            debug!("Adding asset : {:?}", asset);
-            let mut content = Vec::new();
-            self.handler
-                .read(&asset.location_on_disk, &mut content)
-                .map_err(|_| Error::AssetOpen)?;
-            let mt = asset.mimetype.to_string();
-            self.builder.add_resource(&asset.filename, &*content, mt)?;
-            count += 1;
+            match self.handler.download(asset) {
+                Ok(_) => {
+                    debug!("Adding asset : {:?}", asset);
+                    let mut content = Vec::new();
+                    if let Err(e) = self.handler.read(&asset.location_on_disk, &mut content) {
+                        warn!("Failed to read resource {:?}: {}，skip", asset.filename, e);
+                        continue;
+                    }
+                    let mt = asset.mimetype.to_string();
+                    if let Err(e) = self.builder.add_resource(&asset.filename, &*content, mt) {
+                        warn!("Failed to add resource {:?}: {}，skip", asset.filename, e);
+                        continue;
+                    }
+                    count += 1;
+                },
+                Err(e) => {
+                    warn!("Failed to download resource {:?}: {}，skip", asset.filename, e);
+                    continue;
+                }
+            }
         }
         debug!("Embedded '{}' additional assets", count);
         Ok(())

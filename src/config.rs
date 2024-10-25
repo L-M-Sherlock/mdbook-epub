@@ -23,6 +23,8 @@ pub struct Config {
     pub no_section_label: bool,
     /// Use "smart quotes" instead of the usual `"` character.
     pub curly_quotes: bool,
+    /// Skip finding assets.
+    pub skip_assets: bool,
 }
 
 impl Config {
@@ -67,6 +69,7 @@ impl Default for Config {
             cover_image: None,
             additional_resources: Vec::new(),
             no_section_label: false,
+            skip_assets: false,
             curly_quotes: false,
         }
     }
